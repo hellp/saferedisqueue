@@ -15,7 +15,7 @@ implemented, but a development branch already exists.
 All actions are atomic and it is safe to have multiple producers and consumers
 accessing the same queue concurrently.
 
-:copyright: (c) Ferret Go GmbH
+:copyright: (c) Ferret Go GmbH, Sean Buttinger, Fabian Neumann
 :license: All Rights Reserved. For now.
 """
 
