@@ -16,7 +16,7 @@ All actions are atomic and it is safe to have multiple producers and consumers
 accessing the same queue concurrently.
 
 :copyright: (c) Ferret Go GmbH
-:license: BSD, see LICENSE for more details.
+:license: All Rights Reserved. For now.
 """
 
 __version__ = '0.1.0'
