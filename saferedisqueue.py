@@ -145,8 +145,6 @@ if __name__ == "__main__":
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
             queue.push_item(line.strip())
-        # for i in range(10):
-        #     queue.push_item("Quick brown fox jumps over hullifoop.")
     elif sys.argv[1] == 'consumer':
         while True:
             uid, item = queue.pop_item()
