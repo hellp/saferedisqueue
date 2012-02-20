@@ -29,9 +29,10 @@ import redis
 
 class SafeRedisQueue(object):
 
-    QUEUE_KEY = 'fb_queue'
-    ACKBUF_KEY = 'fb_ackbuf'
-    ITEM_KEY_PREFIX = 'fb_item'
+    PREFIX = 'fb'
+    QUEUE_KEY = PREFIX + '_queue'
+    ACKBUF_KEY = PREFIX + '_ackbuf'
+    ITEM_KEY_PREFIX = PREFIX + '_item'
 
     def __init__(self, *args, **kwargs):
         self._redis = redis.StrictRedis(*args, **kwargs)
@@ -47,9 +48,9 @@ class SafeRedisQueue(object):
         """
         uid = uuid.uuid4()
         self._redis.pipeline()\
-                .set(self._item_key(uid), item)\
-                .lpush(self.QUEUE_KEY, uid)\
-                .execute()
+            .set(self._item_key(uid), item)\
+            .lpush(self.QUEUE_KEY, uid)\
+            .execute()
 
     def get_item(self, uid):
         """Get item for uid.
@@ -73,9 +74,9 @@ class SafeRedisQueue(object):
         Removes uid from ackbuffer and deletes the corresponding item.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, uid)\
-                   .delete(self._item_key(uid))\
-                   .execute()
+            .lrem(self.ACKBUF_KEY, 0, uid)\
+            .delete(self._item_key(uid))\
+            .execute()
 
     def fail_item(self, uid):
         """Report item as not successfully consumed.
@@ -83,9 +84,9 @@ class SafeRedisQueue(object):
         Removes uid from ackbuffer and re-enqueues it.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, uid)\
-                   .lpush(self.QUEUE_KEY, uid)\
-                   .execute()
+            .lrem(self.ACKBUF_KEY, 0, uid)\
+            .lpush(self.QUEUE_KEY, uid)\
+            .execute()
 
 
 if __name__ == "__main__":
@@ -108,8 +109,6 @@ if __name__ == "__main__":
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
             queue.push_item(line.strip())
-        # for i in range(10):
-        #     queue.push_item("Quick brown fox jumps over hullifoop.")
     elif sys.argv[1] == 'consumer':
         while True:
             uid, item = queue.pop_item()
