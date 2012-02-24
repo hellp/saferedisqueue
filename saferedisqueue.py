@@ -127,27 +127,35 @@ class SafeRedisQueue(object):
 
 if __name__ == "__main__":
     import sys
-    queue = SafeRedisQueue()
 
     def _usage():
         sys.stdout.writelines([
-            'Commandline usage: python saferedisqueue.py <consumer | producer>\n'
+            'Commandline usage: python saferedisqueue.py <consumer | producer | demo>\n'
             'Example:\n'
-            '    $ echo "Hello World!" | python saferedisqueue.py producer\n'
+            '    $ echo "Hello World" | python saferedisqueue.py producer\n'
             '    $ python saferedisqueue.py consumer\n'
-            '    cbdabbc8-1c0f-4eb0-8733-fdb62a9c0fa6 Hello World!\n'
+            '    cbdabbc8-1c0f-4eb0-8733-fdb62a9c0fa6 Hello World\n'
         ])
         sys.exit(1)
 
     if len(sys.argv) != 2:
         _usage()
 
+    queue = SafeRedisQueue()
+
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
             queue.push_item(line.strip())
     elif sys.argv[1] == 'consumer':
         while True:
-            uid, item = queue.pop_item()
+            uid, item = queue.pop_item(timeout=1)
+            queue.ack_item(uid)
+            print uid, item
+    elif sys.argv[1] == 'demo':
+        map(queue.push_item, ['Hello', 'World'])
+        while True:
+            uid, item = queue.pop_item(timeout=1)
+            queue.ack_item(uid)
             print uid, item
     else:
         _usage()
