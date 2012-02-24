@@ -27,15 +27,16 @@ import redis
 
 class SafeRedisQueue(object):
 
-    QUEUE_KEY = 'srq_queue'
-    ACKBUF_KEY = 'srq_ackbuf'
-    BACKUP = 'srq_backup'
-    BACKUP_LOCK = 'srq:lock:backup'
-    ITEM_KEY_PREFIX = 'srq_item'
     AUTOCLEAN_TIMEOUT = 60
 
-    def __init__(self, *args, **kwargs):
-        self._redis = redis.StrictRedis(*args, **kwargs)
+    def __init__(self, *args, **kw):
+        prefix = kw.pop('prefix', 'srq')
+        self.QUEUE_KEY = '%s:queue' % prefix
+        self.ITEM_KEY_PREFIX = '%s:item' % prefix
+        self.ACKBUF_KEY = '%s:ackbuf' % prefix
+        self.BACKUP = '%s:backup' % prefix
+        self.BACKUP_LOCK = '%s:lock:backup' % prefix
+        self._redis = redis.StrictRedis(*args, **kw)
 
     def _item_key(self, uid):
         return '%s:%s' % (self.ITEM_KEY_PREFIX, uid)
