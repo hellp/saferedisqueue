@@ -35,7 +35,7 @@ class SafeRedisQueue(object):
         self.ITEMS_KEY = '%s:items' % prefix
         self.ACKBUF_KEY = '%s:ackbuf' % prefix
         self.BACKUP = '%s:backup' % prefix
-        self.BACKUP_LOCK = '%s:lock:backup' % prefix
+        self.BACKUP_LOCK = '%s:backuplock' % prefix
         self._redis = redis.StrictRedis(*args, **kw)
 
     def _autoclean(self):
