@@ -154,7 +154,7 @@ if __name__ == "__main__":
     elif sys.argv[1] == 'demo':
         map(queue.push_item, ['Hello', 'World'])
         while True:
-            uid, item = queue.pop_item(timeout=0.5)
+            uid, item = queue.pop_item(timeout=1)
             if uid is None:
                 sys.exit()
             queue.ack_item(uid)
