@@ -70,7 +70,7 @@ class SafeRedisQueue(object):
                 except redis.WatchError:
                     pass
 
-    def push_item(self, item):
+    def push(self, item):
         """Adds an item to the queue.
 
         Generates a uid for later referral.
@@ -82,7 +82,7 @@ class SafeRedisQueue(object):
                 .lpush(self.QUEUE_KEY, uid)\
                 .execute()
 
-    def pop_item(self, timeout=0):
+    def pop(self, timeout=0):
         """Get next item from queue. Blocks if queue is empty.
 
         Pops uid from queue and writes it to ackbuffer.
@@ -93,7 +93,7 @@ class SafeRedisQueue(object):
         item = self._redis.hget(self.ITEMS_KEY, uid)
         return uid, item
 
-    def ack_item(self, uid):
+    def ack(self, uid):
         """Acknowledge item as successfully consumed.
 
         Removes uid from ackbuffer and deletes the corresponding item.
@@ -104,7 +104,7 @@ class SafeRedisQueue(object):
                    .hdel(self.ITEMS_KEY, uid)\
                    .execute()
 
-    def fail_item(self, uid):
+    def fail(self, uid):
         """Report item as not successfully consumed.
 
         Removes uid from ackbuffer and re-enqueues it.
@@ -136,19 +136,19 @@ if __name__ == "__main__":
 
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
-            queue.push_item(line.strip())
+            queue.push(line.strip())
     elif sys.argv[1] == 'consumer':
         while True:
-            uid, item = queue.pop_item()
-            queue.ack_item(uid)
+            uid, item = queue.pop()
+            queue.ack(uid)
             print uid, item
     elif sys.argv[1] == 'demo':
-        map(queue.push_item, ['Hello', 'World'])
+        map(queue.push, ['Hello', 'World'])
         while True:
-            uid, item = queue.pop_item(timeout=1)
+            uid, item = queue.pop(timeout=1)
             if uid is None:
                 sys.exit()
-            queue.ack_item(uid)
+            queue.ack(uid)
             print uid, item
     else:
         _usage()
