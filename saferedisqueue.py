@@ -30,7 +30,7 @@ class SafeRedisQueue(object):
     AUTOCLEAN_TIMEOUT = 60
 
     def __init__(self, *args, **kw):
-        prefix = kw.pop('prefix', 'srq')
+        prefix = 'srq:%s' % kw.pop('name', '0')
         self.QUEUE_KEY = '%s:queue' % prefix
         self.ITEMS_KEY = '%s:items' % prefix
         self.ACKBUF_KEY = '%s:ackbuf' % prefix
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         _usage()
 
-    queue = SafeRedisQueue()
+    queue = SafeRedisQueue(name='test')
 
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
