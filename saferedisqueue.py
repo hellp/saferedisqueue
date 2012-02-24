@@ -56,8 +56,7 @@ class SafeRedisQueue(object):
                 while self._redis.rpoplpush(self.BACKUP, self.QUEUE_KEY):
                     pass
                 self._redis.pipeline()\
-                    .multi()\
-                    .renamenx(self.ACKBUF_KEY, self.BACKUP)\
+                    .rename(self.ACKBUF_KEY, self.BACKUP)\
                     .expire(self.BACKUP_LOCK, self.AUTOCLEAN_TIMEOUT)\
                     .execute()
         else:
@@ -65,8 +64,8 @@ class SafeRedisQueue(object):
                 try:
                     pipe.watch(self.BACKUP_LOCK)
                     if not pipe.exists(self.BACKUP_LOCK):
-                        pipe.multi()\
-                            .renamenx(self.ACKBUF_KEY, self.BACKUP)\
+                        pipe.multi()
+                        pipe.renamenx(self.ACKBUF_KEY, self.BACKUP)\
                             .setex(self.BACKUP_LOCK, self.AUTOCLEAN_TIMEOUT, 1)\
                             .execute()
                     else:
