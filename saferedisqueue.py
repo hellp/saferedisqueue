@@ -32,14 +32,11 @@ class SafeRedisQueue(object):
     def __init__(self, *args, **kw):
         prefix = kw.pop('prefix', 'srq')
         self.QUEUE_KEY = '%s:queue' % prefix
-        self.ITEM_KEY_PREFIX = '%s:item' % prefix
+        self.ITEMS_KEY = '%s:items' % prefix
         self.ACKBUF_KEY = '%s:ackbuf' % prefix
         self.BACKUP = '%s:backup' % prefix
         self.BACKUP_LOCK = '%s:lock:backup' % prefix
         self._redis = redis.StrictRedis(*args, **kw)
-
-    def _item_key(self, uid):
-        return '%s:%s' % (self.ITEM_KEY_PREFIX, uid)
 
     def _autoclean(self):
         if self._redis.exists(self.BACKUP_LOCK):
@@ -81,15 +78,9 @@ class SafeRedisQueue(object):
         """
         uid = uuid.uuid4()
         self._redis.pipeline()\
-                .set(self._item_key(uid), item)\
+                .hset(self.ITEMS_KEY, uid, item)\
                 .lpush(self.QUEUE_KEY, uid)\
                 .execute()
-
-    def get_item(self, uid):
-        """Get item for uid.
-        """
-        item = self._redis.get(self._item_key(uid))
-        return item
 
     def pop_item(self, timeout=0):
         """Get next item from queue. Blocks if queue is empty.
@@ -99,7 +90,7 @@ class SafeRedisQueue(object):
         """
         self._autoclean()
         uid = self._redis.brpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY, timeout)
-        item = self.get_item(uid)
+        item = self._redis.hget(self.ITEMS_KEY, uid)
         return uid, item
 
     def ack_item(self, uid):
@@ -110,7 +101,7 @@ class SafeRedisQueue(object):
         self._redis.pipeline()\
                    .lrem(self.ACKBUF_KEY, 0, uid)\
                    .lrem(self.BACKUP, 0, uid)\
-                   .delete(self._item_key(uid))\
+                   .hdel(self.ITEMS_KEY, uid)\
                    .execute()
 
     def fail_item(self, uid):
