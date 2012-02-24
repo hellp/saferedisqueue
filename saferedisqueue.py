@@ -108,8 +108,8 @@ class SafeRedisQueue(object):
         Removes uid from ackbuffer and deletes the corresponding item.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, uid)\
-                   .lrem(self.BACKUP, uid)\
+                   .lrem(self.ACKBUF_KEY, 0, uid)\
+                   .lrem(self.BACKUP, 0, uid)\
                    .delete(self._item_key(uid))\
                    .execute()
 
@@ -119,8 +119,8 @@ class SafeRedisQueue(object):
         Removes uid from ackbuffer and re-enqueues it.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, uid)\
-                   .lrem(self.BACKUP, uid)\
+                   .lrem(self.ACKBUF_KEY, 0, uid)\
+                   .lrem(self.BACKUP, 0, uid)\
                    .lpush(self.QUEUE_KEY, uid)\
                    .execute()
 
