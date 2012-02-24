@@ -17,7 +17,7 @@ accessing the same queue concurrently.
 :license: All Rights Reserved. For now.
 """
 
-__version__ = '0.1.0'
+__version__ = '0.2.0-alpha'
 
 
 import uuid
