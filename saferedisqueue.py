@@ -17,9 +17,6 @@ accessing the same queue concurrently.
 :license: All Rights Reserved. For now.
 """
 
-__version__ = '0.2.0'
-
-
 import uuid
 
 import redis
