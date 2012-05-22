@@ -24,7 +24,7 @@ import redis
 
 class SafeRedisQueue(object):
 
-    AUTOCLEAN_TIMEOUT = 60
+    AUTOCLEAN_INTERVAL = 60
 
     def __init__(self, *args, **kw):
         prefix = 'srq:%s' % kw.pop('name', '0')
@@ -33,9 +33,13 @@ class SafeRedisQueue(object):
         self.ACKBUF_KEY = '%s:ackbuf' % prefix
         self.BACKUP = '%s:backup' % prefix
         self.BACKUP_LOCK = '%s:backuplock' % prefix
+        self.AUTOCLEAN_INTERVAL = kw.pop('autoclean_interval',
+                                         self.AUTOCLEAN_INTERVAL)
         self._redis = redis.StrictRedis(*args, **kw)
 
     def _autoclean(self):
+        if self.AUTOCLEAN_INTERVAL is None:
+            return
         if self._redis.exists(self.BACKUP_LOCK):
             return
         if self._redis.exists(self.BACKUP):
@@ -51,7 +55,7 @@ class SafeRedisQueue(object):
                     pass
                 self._redis.pipeline()\
                     .rename(self.ACKBUF_KEY, self.BACKUP)\
-                    .expire(self.BACKUP_LOCK, self.AUTOCLEAN_TIMEOUT)\
+                    .expire(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL)\
                     .execute()
         else:
             with self._redis.pipeline() as pipe:
@@ -60,7 +64,7 @@ class SafeRedisQueue(object):
                     if not pipe.exists(self.BACKUP_LOCK):
                         pipe.multi()
                         pipe.renamenx(self.ACKBUF_KEY, self.BACKUP)\
-                            .setex(self.BACKUP_LOCK, self.AUTOCLEAN_TIMEOUT, 1)\
+                            .setex(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL, 1)\
                             .execute()
                     else:
                         pipe.unwatch()

@@ -2,6 +2,15 @@
 Changes
 =======
 
+0.3.0 - 2012-05-22
+------------------
+
+- The constructor now accepts an "autoclean_interval" value to set the interval
+  at which the ackbuf -> backup rotation and backup requeuing happens.
+  Setting the value to `None` disables autoclean completely.
+  Default: 60 (seconds).
+
+
 0.2.2 - 2012-03-29
 ------------------
 
