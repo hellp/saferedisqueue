@@ -2,6 +2,12 @@
 Changes
 =======
 
+1.0.0 - 2013-06-05
+------------------
+
+- Released as open-source under 3-clause BSD license. Code identical to 0.3.0.
+
+
 0.3.0 - 2012-05-22
 ------------------
 
