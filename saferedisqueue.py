@@ -5,16 +5,10 @@ saferedisqueue
 
 A small wrapper around Redis that provides access to a FIFO queue and allows
 upstream code to mark pop'ed items as processed successfully (ACK'ing) or
-unsucessfully (FAIL'ing). Failed items are automatically requeued. Addionally
-a backup is kept for items that were neither ack'ed nor fail'ed, i.e. in case
-the consumer crashes. The backup items will be requeued as soon as one of the
-consumer(s) comes up again.
+unsucessfully (FAIL'ing).
 
-All actions are atomic and it is safe to have multiple producers and consumers
-accessing the same queue concurrently.
-
-:copyright: (c) Ferret Go GmbH, Sean Buttinger, Fabian Neumann
-:license: All Rights Reserved. For now.
+:copyright: (c) Fabian Neumann, ferret go GmbH
+:license: BSD, see LICENSE for details
 """
 
 import uuid
