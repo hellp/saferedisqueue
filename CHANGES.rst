@@ -2,6 +2,17 @@
 Changes
 =======
 
+1.0.1 - 2013-06-26
+------------------
+
+- Changed dependency on redis to require at least version 2.4.10 as
+  redis.StrictRedis, which we use, was only introduced in that version.
+  This should not affect anyone negatively as you wouldn't have to be able
+  to use saferedisqueue at all if your project or package used an older
+  version so far.
+  (Thanks Telofy!)
+
+
 1.0.0 - 2013-06-05
 ------------------
 
