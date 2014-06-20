@@ -2,7 +2,7 @@
 Changes
 =======
 
-1.1.0 - Unreleased
+1.1.0 - 2014-06-20
 ------------------
 
 - The constructor now accepts a "url" keyword parameter that supports
