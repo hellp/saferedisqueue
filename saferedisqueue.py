@@ -29,7 +29,11 @@ class SafeRedisQueue(object):
         self.BACKUP_LOCK = '%s:backuplock' % prefix
         self.AUTOCLEAN_INTERVAL = kw.pop('autoclean_interval',
                                          self.AUTOCLEAN_INTERVAL)
-        self._redis = redis.StrictRedis(*args, **kw)
+        url = kw.pop('url', None)
+        if url is not None:
+            self._redis = redis.StrictRedis.from_url(url, **kw)
+        else:
+            self._redis = redis.StrictRedis(*args, **kw)
 
     def _autoclean(self):
         if self.AUTOCLEAN_INTERVAL is None:

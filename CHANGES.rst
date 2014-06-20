@@ -2,6 +2,14 @@
 Changes
 =======
 
+1.1.0 - Unreleased
+------------------
+
+- The constructor now accepts a "url" keyword parameter that supports
+  typical redis URL a la "redis://[:password]@localhost:6379/0". See
+  README for details.
+
+
 1.0.1 - 2013-06-26
 ------------------
 

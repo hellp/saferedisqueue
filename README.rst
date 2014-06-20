@@ -68,7 +68,21 @@ Constructor parameters
 `SafeRedisQueue` accepts ``*args, **kwargs`` and passes them to
 `redis.StrictRedis`, so use whatever you need.
 
-*Two exceptions*, use these in the keyword arguments to configure `SafeRedisQueue` itself:
+*Three exceptions*, use these in the keyword arguments to configure
+`SafeRedisQueue` itself:
+
+`url`
+    Shortcut to use instead of a host/port/db/password combinations.
+    Accepts "redis URLs" just as the redis library does, for example:
+
+    - redis://[:password]@localhost:6379/0
+    - unix://[:password]@/path/to/socket.sock?db=0
+
+    When using this keyword parameter, all positional arguments (usually
+    one the host) are ignored. Those two are equivalent:
+
+    - ``SafeRedisQueue('localhost', port=6379, db=7)``
+    - ``SafeRedisQueue(url='redis://localhost:6379/7')``
 
 `name`
     A prefix used for the keys in Redis. Default: "0", which creates the
