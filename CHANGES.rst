@@ -2,6 +2,18 @@
 Changes
 =======
 
+2.0.0 - 2014-06-26
+------------------
+
+- SafeRedisQueue is now officially compatible with recent versions
+  (roughly speaking 2.7-2.10) of redis.py.
+
+  For versions 2.4 and 2.6 please continue using the 1.x development
+  line.
+
+  See README.rst for details on compatibility.
+
+
 1.1.0 - 2014-06-20
 ------------------
 
