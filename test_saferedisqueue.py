@@ -2,6 +2,8 @@
 from uuid import uuid1
 import time
 
+import pytest
+
 from saferedisqueue import SafeRedisQueue
 
 
@@ -50,3 +52,40 @@ def test_autocleanup():
     assert queue._redis.llen(queue.ACKBUF_KEY) == 1
     assert queue._redis.llen(queue.BACKUP) == 0
     assert queue._redis.llen(queue.QUEUE_KEY) == 0
+
+
+@pytest.mark.parametrize("func_name, ok_return_val, err_return_val", [
+    ('renameifexists', 'OK', 'OK'),
+    ('renamenxifexists', 1, 0),
+])
+def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
+    queue = SafeRedisQueue()
+    key1 = 'test_saferedisqueue_' + uuid1().hex
+    key2 = 'test_saferedisqueue_' + uuid1().hex
+    key3 = 'test_saferedisqueue_' + uuid1().hex
+    key4 = 'test_saferedisqueue_' + uuid1().hex
+
+    func = getattr(queue, '_redis_' + func_name)
+
+    assert queue._redis.exists(key1) is False
+    assert queue._redis.exists(key2) is False
+
+    queue._redis.set(key1, 'foobar')
+    assert queue._redis.exists(key1) is True
+    assert queue._redis.exists(key2) is False
+
+    assert func(keys=[key1, key2]) == ok_return_val
+    assert queue._redis.exists(key1) is False
+    assert queue._redis.get(key2) == 'foobar'
+
+    assert func(keys=[key1, key2]) == 'OK'
+    assert func(keys=[key3, key2]) == 'OK'
+
+    queue._redis.set(key4, 'foobar')
+    assert func(keys=[key4, key2]) == err_return_val
+
+    # cleanup
+    queue._redis.delete(key1)
+    queue._redis.delete(key2)
+    queue._redis.delete(key3)
+    queue._redis.delete(key4)

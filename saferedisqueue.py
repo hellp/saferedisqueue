@@ -35,6 +35,24 @@ class SafeRedisQueue(object):
         else:
             self._redis = redis.StrictRedis(*args, **kw)
 
+        self._redis_renameifexists = self._redis.register_script("""
+            if redis.pcall('exists', KEYS[1]) == 1
+            then
+                return redis.pcall('rename', KEYS[1], KEYS[2])
+            else
+                return {ok='OK'}
+            end
+        """)
+
+        self._redis_renamenxifexists = self._redis.register_script("""
+            if redis.pcall('exists', KEYS[1]) == 1
+            then
+                return redis.pcall('renamenx', KEYS[1], KEYS[2])
+            else
+                return {ok='OK'}
+            end
+        """)
+
     def _autoclean(self):
         if self.AUTOCLEAN_INTERVAL is None:
             return
@@ -51,19 +69,23 @@ class SafeRedisQueue(object):
                 # requeuing. Although that is very unlikely.
                 while self._redis.rpoplpush(self.BACKUP, self.QUEUE_KEY):
                     pass
-                self._redis.pipeline()\
-                    .rename(self.ACKBUF_KEY, self.BACKUP)\
-                    .expire(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL)\
-                    .execute()
+                with self._redis.pipeline() as pipe:
+                    self._redis_renameifexists(
+                        keys=[self.ACKBUF_KEY, self.BACKUP],
+                        client=pipe)
+                    pipe.expire(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL)
+                    pipe.execute()
         else:
             with self._redis.pipeline() as pipe:
                 try:
                     pipe.watch(self.BACKUP_LOCK)
-                    if not pipe.exists(self.BACKUP_LOCK):
+                    if pipe.exists(self.BACKUP_LOCK) is False:
                         pipe.multi()
-                        pipe.renamenx(self.ACKBUF_KEY, self.BACKUP)\
-                            .setex(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL, 1)\
-                            .execute()
+                        self._redis_renamenxifexists(
+                            keys=[self.ACKBUF_KEY, self.BACKUP],
+                            client=pipe)
+                        pipe.setex(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL, 1)
+                        pipe.execute()
                     else:
                         pipe.unwatch()
                 except redis.WatchError:
