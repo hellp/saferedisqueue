@@ -14,6 +14,14 @@ Changes
   See README.rst for details on compatibility.
 
 
+1.2.0 - 2014-06-26
+------------------
+
+- Raise compatible redis.py version up to 2.6.x. Updated README with
+  compatibility details.
+
+
+
 1.1.0 - 2014-06-20
 ------------------
 
