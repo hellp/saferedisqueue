@@ -27,7 +27,7 @@ setup(
     url='https://github.com/hellp/saferedisqueue',
     py_modules=['saferedisqueue'],
     install_requires=[
-        'redis >= 2.4.10, < 2.5',
+        'redis >= 2.4.10, < 2.7',
     ],
     zip_safe=False,
 )
