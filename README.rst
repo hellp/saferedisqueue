@@ -15,8 +15,18 @@ again.
 All actions are atomic and it is safe to have multiple producers and consumers
 accessing the same queue concurrently.
 
-.. attention:: Currently it only works with Redis 2.4. The code should be easy
-               to adapt to 2.6 — pull requests and patches accepted ;-)
+
+Version compatibility with redis.py
+------------------------------------
+
+===============      ===============
+redis.py             saferedisqueue
+===============      ===============
+2.4.10 - 2.6.x       1.x
+2.7.0 - 2.7.5        no compatible version
+2.7.6 - 2.10.1       2.x
+>=2.10.2             untested
+===============      ===============
 
 
 Usage as a library
