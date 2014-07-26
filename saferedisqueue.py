@@ -167,7 +167,7 @@ if __name__ == "__main__":
         while True:
             uid, item = queue.pop()
             queue.ack(uid)
-            print uid, item
+            print(uid, item)
     elif sys.argv[1] == 'demo':
         map(queue.push, ['Hello', 'World'])
         while True:
@@ -175,6 +175,6 @@ if __name__ == "__main__":
             if uid is None:
                 sys.exit()
             queue.ack(uid)
-            print uid, item
+            print(uid, item)
     else:
         _usage()
