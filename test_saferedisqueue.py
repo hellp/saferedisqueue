@@ -1,3 +1,22 @@
+# Python 2 backwards compatiblity
+import sys
+if sys.version_info[0] < 3:
+    u = lambda x: x.decode()
+    b = lambda x: x
+    unichr = unichr
+    basestring = basestring
+    unicode = unicode
+    bytes = str
+    nativestr = lambda x: \
+        x if isinstance(x, str) else x.encode('utf-8', 'replace')
+else:
+    u = lambda x: x
+    unichr = chr
+    unicode = str
+    bytes = bytes
+    b = lambda x: x.encode('latin-1') if not isinstance(x, bytes) else x
+    nativestr = lambda x: \
+        x if isinstance(x, str) else x.decode('utf-8', 'replace')
 
 from uuid import uuid1
 import time
@@ -5,6 +24,7 @@ import time
 import pytest
 
 from saferedisqueue import SafeRedisQueue
+
 
 
 def test_autocleanup():
@@ -55,7 +75,7 @@ def test_autocleanup():
 
 
 @pytest.mark.parametrize("func_name, ok_return_val, err_return_val", [
-    ('renameifexists', 'OK', 'OK'),
+    ('renameifexists', b'OK', b'OK'),
     ('renamenxifexists', 1, 0),
 ])
 def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
@@ -76,10 +96,10 @@ def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
 
     assert func(keys=[key1, key2]) == ok_return_val
     assert queue._redis.exists(key1) is False
-    assert queue._redis.get(key2) == 'foobar'
+    assert queue._redis.get(key2) == b'foobar'
 
-    assert func(keys=[key1, key2]) == 'OK'
-    assert func(keys=[key3, key2]) == 'OK'
+    assert func(keys=[key1, key2]) == b'OK'
+    assert func(keys=[key3, key2]) == b'OK'
 
     queue._redis.set(key4, 'foobar')
     assert func(keys=[key4, key2]) == err_return_val
@@ -89,3 +109,23 @@ def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
     queue._redis.delete(key2)
     queue._redis.delete(key3)
     queue._redis.delete(key4)
+
+
+def test_decode_responses_true():
+    queue = SafeRedisQueue(
+        name='saferedisqueue-test-%s' % uuid1().hex,
+        decode_responses=True)
+    unicode_string = unichr(3456) + u('abcd') + unichr(3421)
+    queue.push(unicode_string)
+    return_val = queue.pop()[1]
+    assert isinstance(return_val, unicode)
+    assert unicode_string == return_val
+
+
+def test_decode_responses_false():
+    queue = SafeRedisQueue(name='saferedisqueue-test-%s' % uuid1().hex)
+    unicode_string = unichr(3456) + u('abcd') + unichr(3421)
+    queue.push(unicode_string)
+    return_val = queue.pop()[1]
+    assert isinstance(return_val, bytes)
+    assert nativestr(unicode_string) == nativestr(return_val)
