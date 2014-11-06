@@ -111,6 +111,15 @@ Constructor parameters
 
     Pass ``None`` to disable autocleaning. It's enabled by default!
 
+`serializer`
+    An optional serializer to use on the items. Default: None
+    
+    Feel free to write your own serializer. It only requires a ``dumps`` and loads ``methods``.
+    
+    Modules like ``pickle``, ``json``, ``simplejson`` can be used out of the box.
+    
+    JSON serialization is particularly useful in lots of situations.
+
 
 Command line usage
 ==================
