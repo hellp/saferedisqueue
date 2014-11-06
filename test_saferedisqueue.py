@@ -89,3 +89,36 @@ def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
     queue._redis.delete(key2)
     queue._redis.delete(key3)
     queue._redis.delete(key4)
+
+
+# Serializer tests
+# Try with json and pickle serializer
+
+try:
+    import simplejson as JSONSerializer
+except ImportError:
+    import json as JSONSerializer
+
+import pickle as PickleSerializer
+
+
+@pytest.mark.parametrize("serializer", [
+    JSONSerializer,
+    PickleSerializer,
+])
+def test_serializer(serializer):
+
+    queue = SafeRedisQueue(
+        name='saferedisqueue-test-%s' % uuid1().hex,
+        autoclean_interval=1,
+        serializer=serializer
+    )
+
+    item = {'test': 'good', 'values': ['a', 'b', 'c']}
+
+    queue.push(item)
+
+    uid_item, payload_item = queue.pop()
+
+    assert type(item) == type(payload_item)
+    assert item == payload_item
