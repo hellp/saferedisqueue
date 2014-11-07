@@ -124,7 +124,8 @@ class SafeRedisQueue(object):
             uid = self._redis.brpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY, timeout)
         item = self._redis.hget(self.ITEMS_KEY, uid)
 
-        if self.serializer is not None:
+        # Deserialize only if the item exists: it is equal to None if it times out
+        if self.serializer is not None and item is not None:
             item = self.serializer.loads(item)
 
         return uid, item

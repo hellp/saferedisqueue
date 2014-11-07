@@ -116,9 +116,13 @@ def test_serializer(serializer):
 
     item = {'test': 'good', 'values': ['a', 'b', 'c']}
 
+    # Test when there is an element
     queue.push(item)
-
     uid_item, payload_item = queue.pop()
-
     assert type(item) == type(payload_item)
     assert item == payload_item
+
+    # Test when there is no element and it times out
+    uid_item, payload_item = queue.pop(timeout=1)
+    assert None == uid_item
+    assert None == payload_item
