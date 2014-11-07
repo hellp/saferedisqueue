@@ -1,4 +1,8 @@
-MANIFEST
-dist
 .coverage
 .tox
+/bin
+/include
+/lib
+/local
+dist
+MANIFEST
