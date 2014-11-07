@@ -114,7 +114,7 @@ Constructor parameters
 `serializer`
     An optional serializer to use on the items. Default: None
     
-    Feel free to write your own serializer. It only requires a ``dumps`` and loads ``methods``.
+    Feel free to write your own serializer. It only requires a ``dumps`` and ``loads`` methods.
     
     Modules like ``pickle``, ``json``, ``simplejson`` can be used out of the box.
     
