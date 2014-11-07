@@ -2,6 +2,14 @@
 Changes
 =======
 
+Unreleased
+----------
+
+- Increased version compatibility with redis.py to "<2.11".
+- Python 3.4 support
+- More tests. Introduced tox for testing.
+
+
 2.0.0 - 2014-06-26
 ------------------
 
