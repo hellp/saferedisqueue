@@ -8,6 +8,9 @@ Unreleased
 - Increased version compatibility with redis.py to "<2.11".
 - Python 3.4 support
 - More tests. Introduced tox for testing.
+- Added `serializer` parameter to support custom serializers,
+  e.g. for automatic JSON conversion. See README for details, especially
+  when using Python 3.
 
 
 2.0.0 - 2014-06-26

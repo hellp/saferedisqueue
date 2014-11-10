@@ -29,6 +29,8 @@ class SafeRedisQueue(object):
         self.BACKUP_LOCK = '%s:backuplock' % prefix
         self.AUTOCLEAN_INTERVAL = kw.pop('autoclean_interval',
                                          self.AUTOCLEAN_INTERVAL)
+        self.serializer = kw.pop('serializer', None)
+
         url = kw.pop('url', None)
         if url is not None:
             self._redis = redis.StrictRedis.from_url(url, **kw)
@@ -98,6 +100,10 @@ class SafeRedisQueue(object):
         Enqueues the uid and stores the item.
         """
         uid = uuid.uuid4()
+
+        if self.serializer is not None:
+            item = self.serializer.dumps(item)
+
         self._redis.pipeline()\
                 .hset(self.ITEMS_KEY, uid, item)\
                 .lpush(self.QUEUE_KEY, uid)\
@@ -122,6 +128,11 @@ class SafeRedisQueue(object):
         else:
             uid = self._redis.brpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY, timeout)
         item = self._redis.hget(self.ITEMS_KEY, uid)
+
+        # Deserialize only if the item exists: it is equal to None if it times out
+        if self.serializer is not None and item is not None:
+            item = self.serializer.loads(item)
+
         return uid, item
 
     def ack(self, uid):

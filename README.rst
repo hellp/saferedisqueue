@@ -110,6 +110,31 @@ Constructor parameters
 
     Pass ``None`` to disable autocleaning. It's enabled by default!
 
+`serializer`
+    An optional serializer to use on the items. Default: None
+
+    Feel free to write your own serializer. It only requires a ``dumps``
+    and ``loads`` methods. Modules like ``pickle``, ``json``,
+    ``simplejson`` can be used out of the box.
+
+    Note however, that when using Python 3 the ``json`` module has to be
+    wrapped as it by default does not handle the ``bytes`` properly that
+    is emitted by the underlying redis.py networking code. This should
+    work::
+
+        class MyJSONSerializer(object):
+            @staticmethod
+            def loads(bytes):
+                return json.loads(bytes.decode('utf-8'))
+
+            @staticmethod
+            def dumps(data):
+                return json.dumps(data)
+
+        queue = SafeRedisQueue(name='foobar',serializer=MyJSONSerializer)
+
+    *Added in version 3.0.0*
+
 
 Command line usage
 ==================
