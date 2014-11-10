@@ -39,7 +39,7 @@ Usage as a library
 >>> queue.get()
 ('1df060eb-b578-499d-bede-20db9da8184e', 'Foo bar')
 
-Note: to be compatible with previous versions, 2 aliases `push/pop` exist. Start using the new `put/get` terminology as soon as possible since `push/pop` will be deleted in a future version.
+Note: to be compatible with previous versions, 2 aliases ``push/pop`` exist. Start using the new ``put/get`` terminology as soon as possible since ``push/pop`` will be deleted in a future version.
 
 
 ACK'ing and FAIL'ing
