@@ -185,16 +185,16 @@ if __name__ == "__main__":
 
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
-            queue.push(line.strip())
+            queue.put(line.strip())
     elif sys.argv[1] == 'consumer':
         while True:
-            uid, item = queue.pop()
+            uid, item = queue.get()
             queue.ack(uid)
             print(uid, item)
     elif sys.argv[1] == 'demo':
-        map(queue.push, ['Hello', 'World'])
+        map(queue.put, ['Hello', 'World'])
         while True:
-            uid, item = queue.pop(timeout=1)
+            uid, item = queue.get(timeout=1)
             if uid is None:
                 sys.exit()
             queue.ack(uid)
