@@ -9,3 +9,4 @@ Patches and Suggestions
 -----------------------
 
 - Telofy
+- Michael Palumbo (https://github.com/YAmikep)
