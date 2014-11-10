@@ -32,27 +32,29 @@ Usage as a library
 ==================
 
 >>> queue = SafeRedisQueue(name='test')
->>> queue.push("Hello World")
->>> queue.push("Foo bar")
->>> queue.pop()
+>>> queue.put("Hello World")
+>>> queue.put("Foo bar")
+>>> queue.get()
 ('595d43b2-2e49-4e96-a1d2-0848d1c7f0d3', 'Hello World')
->>> queue.pop()
+>>> queue.get()
 ('1df060eb-b578-499d-bede-20db9da8184e', 'Foo bar')
+
+Note: to be compatible with previous versions, 2 aliases `push/pop` exist. Start using the new `put/get` terminology as soon as possible since `push/pop` will be deleted in a future version.
 
 
 ACK'ing and FAIL'ing
 --------------------
 
->>> queue.push("Good stuff")
->>> queue.push("Bad stuff")
->>> uid_good, payload_good = queue.pop()
->>> uid_bad, payload_bad = queue.pop()
+>>> queue.put("Good stuff")
+>>> queue.put("Bad stuff")
+>>> uid_good, payload_good = queue.get()
+>>> uid_bad, payload_bad = queue.get()
 ...
 # process the payloads...
 ...
 >>> queue.ack(uid_good)  # done with that one
 >>> queue.fail(uid_bad)  # something didn't work out with that one, let's requeue
->>> uid, payload = queue.pop()  # pop again; we get the requeued payload again
+>>> uid, payload = queue.get()  # get again; we get the requeued payload again
 >>> uid == uid_bad
 True
 ...
@@ -61,10 +63,10 @@ True
 >>> queue.ack(uid)  # now it worked; ACK the stuff now
 
 
-pop timeout
+get timeout
 -----------
 
-`SafeRedisQueue.pop` accepts a timeout parameter:
+`SafeRedisQueue.get` accepts a timeout parameter:
 
 - 0 (the default) blocks forever, waiting for items
 - a positive number blocks that amount of seconds
