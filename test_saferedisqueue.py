@@ -31,13 +31,13 @@ def test_autocleanup():
     queue = SafeRedisQueue(
         name='saferedisqueue-test-%s' % uuid1().hex,
         autoclean_interval=1)
-    queue.push('bad')
-    queue.push('good')
+    queue.put('bad')
+    queue.put('good')
     assert queue._redis.llen(queue.QUEUE_KEY) == 2
     assert queue._redis.llen(queue.ACKBUF_KEY) == 0
     assert queue._redis.llen(queue.BACKUP) == 0
 
-    uid_bad, payload_bad = queue.pop()
+    uid_bad, payload_bad = queue.get()
     # Pop triggered first autoclean run before popping. At that time the
     # ackbuf was still empty, so nothing was moved to backup. But the
     # backup lock was set, to delay the next autoclean run for
@@ -46,7 +46,7 @@ def test_autocleanup():
     assert queue._redis.llen(queue.ACKBUF_KEY) == 1  # bad item
     assert queue._redis.llen(queue.BACKUP) == 0
 
-    uid_good, payload_good = queue.pop()
+    uid_good, payload_good = queue.get()
     # Autoclean started but instantly aborted due to backup lock.
     assert queue._redis.llen(queue.ACKBUF_KEY) == 2
     assert queue._redis.llen(queue.BACKUP) == 0
@@ -59,14 +59,14 @@ def test_autocleanup():
 
     # Pop after a autoclean_interval triggers cleanup internally
     time.sleep(1.2)
-    assert queue.pop(timeout=-1) == (None, None)
+    assert queue.get(timeout=-1) == (None, None)
     assert queue._redis.llen(queue.ACKBUF_KEY) == 0
     assert queue._redis.llen(queue.BACKUP) == 1
     assert queue._redis.llen(queue.QUEUE_KEY) == 0
 
     # Next pop triggers autoclean again; requeus; pops bad item again
     time.sleep(1.2)
-    assert queue.pop(timeout=-1) == (uid_bad, payload_bad)
+    assert queue.get(timeout=-1) == (uid_bad, payload_bad)
 
     # After pop, queue is empty again, item waiting in ackbuf
     assert queue._redis.llen(queue.ACKBUF_KEY) == 1
@@ -116,8 +116,8 @@ def test_decode_responses_true():
         name='saferedisqueue-test-%s' % uuid1().hex,
         decode_responses=True)
     unicode_string = unichr(3456) + u('abcd') + unichr(3421)
-    queue.push(unicode_string)
-    return_val = queue.pop()[1]
+    queue.put(unicode_string)
+    return_val = queue.get()[1]
     assert isinstance(return_val, unicode)
     assert unicode_string == return_val
 
@@ -125,8 +125,8 @@ def test_decode_responses_true():
 def test_decode_responses_false():
     queue = SafeRedisQueue(name='saferedisqueue-test-%s' % uuid1().hex)
     unicode_string = unichr(3456) + u('abcd') + unichr(3421)
-    queue.push(unicode_string)
-    return_val = queue.pop()[1]
+    queue.put(unicode_string)
+    return_val = queue.get()[1]
     assert isinstance(return_val, bytes)
     assert nativestr(unicode_string) == nativestr(return_val)
 
