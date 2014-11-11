@@ -18,6 +18,7 @@ else:
     nativestr = lambda x: \
         x if isinstance(x, str) else x.decode('utf-8', 'replace')
 
+
 from uuid import uuid1
 import time
 
@@ -25,6 +26,31 @@ import mock
 import pytest
 
 from saferedisqueue import SafeRedisQueue
+
+
+def test_put_returns_uid_string():
+    queue = SafeRedisQueue(
+        name='saferedisqueue-test-%s' % uuid1().hex,
+        autoclean_interval=1)
+    # TODO: mock uuid.uuid4 here
+    uid = queue.put('blub')
+    assert len(uid) == 36
+    assert type(uid) is str
+
+
+def test_put_internally_converts_uuid_to_str():
+    queue = SafeRedisQueue(
+        name='saferedisqueue-test-%s' % uuid1().hex,
+        autoclean_interval=1)
+
+    # mock it
+    queue._redis = mock.Mock()
+    queue._redis.pipeline.return_value = pipeline_mock = mock.Mock()
+    pipeline_mock.hset.return_value = hset_mock = mock.Mock()
+
+    uid = queue.put('blub')
+    pipeline_mock.hset.assert_called_with(queue.ITEMS_KEY, uid, 'blub')
+    hset_mock.lpush.assert_called_with(queue.QUEUE_KEY, uid)
 
 
 def test_autocleanup():

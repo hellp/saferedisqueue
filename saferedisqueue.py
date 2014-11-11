@@ -99,7 +99,7 @@ class SafeRedisQueue(object):
         Generates a uid for later referral.
         Enqueues the uid and stores the item.
         """
-        uid = uuid.uuid4()
+        uid = str(uuid.uuid4())
 
         if self.serializer is not None:
             item = self.serializer.dumps(item)

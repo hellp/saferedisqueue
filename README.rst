@@ -24,7 +24,7 @@ redis.py             saferedisqueue
 ===============      ===============
 2.4.10 - 2.6.x       1.x
 2.7.0 - 2.7.5        no compatible version
-2.7.6 - 2.10.x       2.x
+2.7.6 - 2.10.x       2.x-3.x
 ===============      ===============
 
 
@@ -33,7 +33,9 @@ Usage as a library
 
 >>> queue = SafeRedisQueue(name='test')
 >>> queue.put("Hello World")
+'595d43b2-2e49-4e96-a1d2-0848d1c7f0d3'
 >>> queue.put("Foo bar")
+'1df060eb-b578-499d-bede-20db9da8184e'
 >>> queue.get()
 ('595d43b2-2e49-4e96-a1d2-0848d1c7f0d3', 'Hello World')
 >>> queue.get()
