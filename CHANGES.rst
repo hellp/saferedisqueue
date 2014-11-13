@@ -2,8 +2,8 @@
 Changes
 =======
 
-Unreleased
-----------
+3.0.0 - 2014-11-13
+------------------
 
 - BREAKING CHANGE (very unlikely, though): `push`/`put` now returns the
   uid of the just added item. Before it always returned `None`.
