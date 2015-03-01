@@ -216,7 +216,7 @@ class SafeRedisQueue(object):
 
 
 def run_cli():
-    queue = SafeRedisQueue(name='stresstest')
+    queue = SafeRedisQueue(name='test')
 
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
