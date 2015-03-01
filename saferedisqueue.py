@@ -215,23 +215,8 @@ class SafeRedisQueue(object):
                    .execute()
 
 
-if __name__ == "__main__":
-    import sys
-
-    def _usage():
-        sys.stdout.writelines([
-            'Commandline usage: python saferedisqueue.py <consumer | producer | demo>\n'
-            'Example:\n'
-            '    $ echo "Hello World" | python saferedisqueue.py producer\n'
-            '    $ python saferedisqueue.py consumer\n'
-            '    cbdabbc8-1c0f-4eb0-8733-fdb62a9c0fa6 Hello World\n'
-        ])
-        sys.exit(1)
-
-    if len(sys.argv) != 2:
-        _usage()
-
-    queue = SafeRedisQueue(name='test')
+def run_cli():
+    queue = SafeRedisQueue(name='stresstest')
 
     if sys.argv[1] == 'producer':
         for line in sys.stdin.readlines():
@@ -251,3 +236,27 @@ if __name__ == "__main__":
             print(uid, item)
     else:
         _usage()
+
+    sys.exit()
+
+
+if __name__ == "__main__":
+    import sys
+
+    def _usage():
+        sys.stdout.writelines([
+            'Commandline usage: python saferedisqueue.py <consumer | producer | demo>\n'
+            'Example:\n'
+            '    $ echo "Hello World" | python saferedisqueue.py producer\n'
+            '    $ python saferedisqueue.py consumer\n'
+            '    cbdabbc8-1c0f-4eb0-8733-fdb62a9c0fa6 Hello World\n'
+        ])
+        sys.exit(1)
+
+    if len(sys.argv) != 2:
+        _usage()
+
+    try:
+        run_cli()
+    except KeyboardInterrupt:
+        sys.exit('\nBye!')
