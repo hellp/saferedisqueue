@@ -101,7 +101,7 @@ class SafeRedisQueue(object):
             # Expire ACKBUF_AGING and push an SRQ instruction to the main queue.
             new_name = self.ACKBUF_EXP_PREFIX + uuid.uuid1().hex
             activate_instr = '__srqinstr__:{uid}:activate:{queue_name}'.format(
-                uid=uuid.uuid1(), queue_name=new_name)
+                uid=uuid.uuid1().hex, queue_name=new_name)
             self.logger.info('autoclean EXPIRE ACKBUF_AGING to %r %r', new_name, activate_instr)
             with self._redis.pipeline() as pipe:
                 pipe.multi()
@@ -116,7 +116,7 @@ class SafeRedisQueue(object):
         Generates a uid for later referral.
         Enqueues the uid and stores the item.
         """
-        uid = str(uuid.uuid4())
+        uid = uuid.uuid4().hex
 
         if self.serializer is not None:
             item = self.serializer.dumps(item)
@@ -181,9 +181,9 @@ class SafeRedisQueue(object):
         if instr == 'activate':
             waiting_q = remainder
             new_waiting_q = '{query_key}-waiting-{uid}'.format(
-                query_key=self.QUEUE_KEY, uid=uuid.uuid1())
+                query_key=self.QUEUE_KEY, uid=uuid.uuid1().hex)
             activate_instr = '__srqinstr__:{uid}:activate:{queue_name}'.format(
-                uid=uuid.uuid1(), queue_name=new_waiting_q)
+                uid=uuid.uuid1().hex, queue_name=new_waiting_q)
             self.logger.info('HANDLE INST: new_waiting_q:%r  activate_instr:%r', new_waiting_q, activate_instr)
             self._redis_activate_queue(
                 keys=[waiting_q, new_waiting_q],
