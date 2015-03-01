@@ -81,8 +81,10 @@ class SafeRedisQueue(object):
                 time.sleep(self.AUTOCLEAN_INTERVAL)
 
         if self.AUTOCLEAN_INTERVAL:
-            Thread(target=autoclean_loop, name="autocleaner",
-                   args=(self, )).start()
+            self._autoclean_thread = Thread(
+                target=autoclean_loop, name="autocleaner", args=(self,))
+            self._autoclean_thread.daemon = True
+            self._autoclean_thread.start()
 
     def _autoclean(self):
         lock = self._dlm.lock(self.ACKBUF_AGING_REDLOCK, self.AUTOCLEAN_INTERVAL * 1000)
