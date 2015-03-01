@@ -71,7 +71,7 @@ class SafeRedisQueue(object):
             then
                 return redis.pcall('renamenx', KEYS[1], KEYS[2])
             else
-                return {ok='OK'}
+                return 0
             end
         """)
 
