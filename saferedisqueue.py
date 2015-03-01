@@ -66,15 +66,6 @@ class SafeRedisQueue(object):
             end
         """.format(queue_key=self.QUEUE_KEY))
 
-        self._redis_renameifexists = self._redis.register_script("""
-            if redis.pcall('exists', KEYS[1]) == 1
-            then
-                return redis.pcall('rename', KEYS[1], KEYS[2])
-            else
-                return {ok='OK'}
-            end
-        """)
-
         self._redis_renamenxifexists = self._redis.register_script("""
             if redis.pcall('exists', KEYS[1]) == 1
             then
