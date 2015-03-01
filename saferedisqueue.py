@@ -11,9 +11,17 @@ unsucessfully (FAIL'ing).
 :license: BSD, see LICENSE for details
 """
 
+from threading import Thread
 import uuid
+import multiprocessing
+import time
 
+from redlock import Redlock
 import redis
+
+
+class UnknownInstruction(Exception):
+    pass
 
 
 class SafeRedisQueue(object):
@@ -21,12 +29,14 @@ class SafeRedisQueue(object):
     AUTOCLEAN_INTERVAL = 60
 
     def __init__(self, *args, **kw):
+        self.logger = multiprocessing.get_logger()
         prefix = 'srq:%s' % kw.pop('name', '0')
         self.QUEUE_KEY = '%s:queue' % prefix
         self.ITEMS_KEY = '%s:items' % prefix
-        self.ACKBUF_KEY = '%s:ackbuf' % prefix
-        self.BACKUP = '%s:backup' % prefix
-        self.BACKUP_LOCK = '%s:backuplock' % prefix
+        self.ACKBUF = '%s:ackbuf' % prefix
+        self.ACKBUF_AGING = '%s:ackbuf_aging' % prefix
+        self.ACKBUF_AGING_REDLOCK = '%s:ackbuf_aging_redlock' % prefix
+        self.ACKBUF_EXP_PREFIX = '%s:ackbuf_expired-' % prefix
         self.AUTOCLEAN_INTERVAL = kw.pop('autoclean_interval',
                                          self.AUTOCLEAN_INTERVAL)
         self.serializer = kw.pop('serializer', None)
@@ -36,6 +46,25 @@ class SafeRedisQueue(object):
             self._redis = redis.StrictRedis.from_url(url, **kw)
         else:
             self._redis = redis.StrictRedis(*args, **kw)
+
+        self._dlm = Redlock([(args, kw)], retry_count=1)
+        self.logger.info(self._dlm)
+
+        self._redis_activate_queue = self._redis.register_script("""
+            local main_queue_existed = redis.pcall('exists', '{queue_key}') == 1
+            if main_queue_existed
+            then
+                redis.pcall('rename', '{queue_key}', KEYS[2])
+            end
+            if redis.pcall('exists', KEYS[1]) == 1
+            then
+                redis.pcall('rename', KEYS[1], '{queue_key}')
+                if main_queue_existed
+                then
+                    redis.pcall('lpush', '{queue_key}', ARGV[1])
+                end
+            end
+        """.format(queue_key=self.QUEUE_KEY))
 
         self._redis_renameifexists = self._redis.register_script("""
             if redis.pcall('exists', KEYS[1]) == 1
@@ -55,43 +84,38 @@ class SafeRedisQueue(object):
             end
         """)
 
+        def autoclean_loop(srq_instance):
+            while True:
+                self._autoclean()
+                time.sleep(self.AUTOCLEAN_INTERVAL)
+
+        if self.AUTOCLEAN_INTERVAL:
+            Thread(target=autoclean_loop, name="autocleaner",
+                   args=(self, )).start()
+
     def _autoclean(self):
-        if self.AUTOCLEAN_INTERVAL is None:
+        lock = self._dlm.lock(self.ACKBUF_AGING_REDLOCK, self.AUTOCLEAN_INTERVAL * 1000)
+        if lock is False or lock.validity < 250:
+            self.logger.info('autoclean NO LOCK :( %r', lock)
             return
-        if self._redis.exists(self.BACKUP_LOCK):
-            return
-        if self._redis.exists(self.BACKUP):
-            # Get the lock
-            if self._redis.setnx(self.BACKUP_LOCK, 1):
-                # There's a potential deadlock here:
-                # If we crash during the while loop, the BACKUP_LOCK will never
-                # be set to expire, blocking the creation of a new backup queue.
-                # Could be solved by setting the expire immediately, although
-                # then the guard could expire before we are done with the
-                # requeuing. Although that is very unlikely.
-                while self._redis.rpoplpush(self.BACKUP, self.QUEUE_KEY):
-                    pass
-                with self._redis.pipeline() as pipe:
-                    self._redis_renameifexists(
-                        keys=[self.ACKBUF_KEY, self.BACKUP],
-                        client=pipe)
-                    pipe.expire(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL)
-                    pipe.execute()
+        self.logger.info('autoclean GOT LOCK :) %r', lock)
+
+        if not self._redis.exists(self.ACKBUF_AGING):
+            self.logger.info('autoclean RENAME TO ACKBUF_AGING')
+            # Rename ACKBUF to ACKBUF_AGING
+            self._redis_renamenxifexists(keys=[self.ACKBUF, self.ACKBUF_AGING])
         else:
+            # Expire ACKBUF_AGING and push an SRQ instruction to the main queue.
+            new_name = self.ACKBUF_EXP_PREFIX + uuid.uuid1().hex
+            activate_instr = '__srqinstr__:{uid}:activate:{queue_name}'.format(
+                uid=uuid.uuid1(), queue_name=new_name)
+            self.logger.info('autoclean EXPIRE ACKBUF_AGING to %r %r', new_name, activate_instr)
             with self._redis.pipeline() as pipe:
-                try:
-                    pipe.watch(self.BACKUP_LOCK)
-                    if pipe.exists(self.BACKUP_LOCK) is False:
-                        pipe.multi()
-                        self._redis_renamenxifexists(
-                            keys=[self.ACKBUF_KEY, self.BACKUP],
-                            client=pipe)
-                        pipe.setex(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL, 1)
-                        pipe.execute()
-                    else:
-                        pipe.unwatch()
-                except redis.WatchError:
-                    pass
+                pipe.multi()
+                pipe.rename(self.ACKBUF_AGING, new_name)
+                pipe.lpush(self.QUEUE_KEY, activate_instr)
+                pipe.execute()
+        self.logger.info('autoclean DONE')
 
     def put(self, item):
         """Adds an item to the queue.
@@ -119,18 +143,26 @@ class SafeRedisQueue(object):
         Blocks if queue is empty, see `timeout` parameter.
 
         Internally this also pops uid from queue and writes it to
-        ackbuffer.
+        "ackbuffer", where it waits to be ack'ed or fail'ed.
 
         :param timeout: blocking timeout in seconds
                         - 0: block forever (default)
                         - negative: disable blocking
 
         """
-        self._autoclean()
-        if timeout < 0:
-            uid = self._redis.rpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY)
-        else:
-            uid = self._redis.brpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY, timeout)
+        while True:
+            if timeout < 0:
+                uid = self._redis.rpoplpush(self.QUEUE_KEY, self.ACKBUF)
+            else:
+                uid = self._redis.brpoplpush(self.QUEUE_KEY, self.ACKBUF, timeout)
+
+            if uid is not None and uid.startswith('__srqinstr__'):
+                self._handle_special_instruction(uid)
+                self.ack(uid)
+                continue
+            else:
+                break
+
         item = self._redis.hget(self.ITEMS_KEY, uid)
 
         # Deserialize only if the item exists: it is equal to None if it times out
@@ -142,14 +174,39 @@ class SafeRedisQueue(object):
     # Kept for backwards compatibility
     pop = get
 
+
+    def _handle_special_instruction(self, instr_string):
+        """
+        Handle a special instruction for internal usage by SafeRedisQueue.
+        Those are encoded in a key::
+
+            "__srqinstr__:<uuid>:<instruction_name>[:<remainder>]"
+
+        """
+        self.logger.info('HANDLE instruction %r', instr_string)
+        _preamble, _instr_id, instr, remainder = instr_string.split(':', 3)
+        if instr == 'activate':
+            waiting_q = remainder
+            new_waiting_q = '{query_key}-waiting-{uid}'.format(
+                query_key=self.QUEUE_KEY, uid=uuid.uuid1())
+            activate_instr = '__srqinstr__:{uid}:activate:{queue_name}'.format(
+                uid=uuid.uuid1(), queue_name=new_waiting_q)
+            self.logger.info('HANDLE INST: new_waiting_q:%r  activate_instr:%r', new_waiting_q, activate_instr)
+            self._redis_activate_queue(
+                keys=[waiting_q, new_waiting_q],
+                args=[activate_instr])
+        else:
+            raise UnknownInstruction('Unknown instruction: %r' % instr)
+
+
     def ack(self, uid):
         """Acknowledge item as successfully consumed.
 
         Removes uid from ackbuffer and deletes the corresponding item.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, 0, uid)\
-                   .lrem(self.BACKUP, 0, uid)\
+                   .lrem(self.ACKBUF, 0, uid)\
+                   .lrem(self.ACKBUF_AGING, 0, uid)\
                    .hdel(self.ITEMS_KEY, uid)\
                    .execute()
 
@@ -159,8 +216,8 @@ class SafeRedisQueue(object):
         Removes uid from ackbuffer and re-enqueues it.
         """
         self._redis.pipeline()\
-                   .lrem(self.ACKBUF_KEY, 0, uid)\
-                   .lrem(self.BACKUP, 0, uid)\
+                   .lrem(self.ACKBUF, 0, uid)\
+                   .lrem(self.ACKBUF_AGING, 0, uid)\
                    .lpush(self.QUEUE_KEY, uid)\
                    .execute()
 
