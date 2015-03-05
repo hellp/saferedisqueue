@@ -8,7 +8,7 @@ LICENSE = open(os.path.join(here, 'LICENSE')).read()
 
 setup(
     name='saferedisqueue',
-    version='4.0dev0',
+    version='4.0.dev0',
     description='A small wrapper around Redis that provides access to a FIFO queue.',
     long_description=README + '\n\n' + CHANGES,
     license=LICENSE,
