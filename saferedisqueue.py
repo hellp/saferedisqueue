@@ -11,6 +11,8 @@ unsucessfully (FAIL'ing).
 :license: BSD, see LICENSE for details
 """
 
+from threading import Thread
+import time
 import uuid
 
 import redis
@@ -25,8 +27,7 @@ class SafeRedisQueue(object):
         self.QUEUE_KEY = '%s:queue' % prefix
         self.ITEMS_KEY = '%s:items' % prefix
         self.ACKBUF_KEY = '%s:ackbuf' % prefix
-        self.BACKUP = '%s:backup' % prefix
-        self.BACKUP_LOCK = '%s:backuplock' % prefix
+        self.ACKBUF_AGING = '%s:ackbuf_aging' % prefix
         self.AUTOCLEAN_INTERVAL = kw.pop('autoclean_interval',
                                          self.AUTOCLEAN_INTERVAL)
         self.serializer = kw.pop('serializer', None)
@@ -37,61 +38,63 @@ class SafeRedisQueue(object):
         else:
             self._redis = redis.StrictRedis(*args, **kw)
 
-        self._redis_renameifexists = self._redis.register_script("""
-            if redis.pcall('exists', KEYS[1]) == 1
-            then
-                return redis.pcall('rename', KEYS[1], KEYS[2])
-            else
-                return {ok='OK'}
+        self._redis_ackbuf_to_aging = self._redis.register_script("""
+            local ackbuf = KEYS[1]
+            local ackbuf_aging = KEYS[2]
+            local now_micros = ARGV[1]
+            local ackbuflen = redis.call('llen', ackbuf)
+            local iterations = math.min(ackbuflen, 100)
+            for i=1,iterations,1
+            do
+                redis.pcall('zadd', ackbuf_aging, now_micros + i, redis.pcall('rpop', ackbuf))
             end
-        """)
+            return ackbuflen - iterations
+            """)
 
-        self._redis_renamenxifexists = self._redis.register_script("""
-            if redis.pcall('exists', KEYS[1]) == 1
+        self._redis_zset_to_list_if_older = self._redis.register_script("""
+            local zset = KEYS[1]
+            local list = KEYS[2]
+            local max_age_s = ARGV[1]
+            local now_micros = ARGV[2]
+            local max_score = now_micros - (max_age_s * 10^6)
+            local values = redis.call('ZRANGEBYSCORE', zset, '-inf', max_score, 'LIMIT', 0, 100)
+            if #values > 0
             then
-                return redis.pcall('renamenx', KEYS[1], KEYS[2])
+                redis.call('LPUSH', list, unpack(values))
+                redis.call('ZREM', zset, unpack(values))
+                return redis.call('ZCOUNT', zset, '-inf', max_score)
             else
-                return {ok='OK'}
+                return 0
             end
-        """)
+            """)
 
-    def _autoclean(self):
-        if self.AUTOCLEAN_INTERVAL is None:
-            return
-        if self._redis.exists(self.BACKUP_LOCK):
-            return
-        if self._redis.exists(self.BACKUP):
-            # Get the lock
-            if self._redis.setnx(self.BACKUP_LOCK, 1):
-                # There's a potential deadlock here:
-                # If we crash during the while loop, the BACKUP_LOCK will never
-                # be set to expire, blocking the creation of a new backup queue.
-                # Could be solved by setting the expire immediately, although
-                # then the guard could expire before we are done with the
-                # requeuing. Although that is very unlikely.
-                while self._redis.rpoplpush(self.BACKUP, self.QUEUE_KEY):
-                    pass
-                with self._redis.pipeline() as pipe:
-                    self._redis_renameifexists(
-                        keys=[self.ACKBUF_KEY, self.BACKUP],
-                        client=pipe)
-                    pipe.expire(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL)
-                    pipe.execute()
-        else:
-            with self._redis.pipeline() as pipe:
-                try:
-                    pipe.watch(self.BACKUP_LOCK)
-                    if pipe.exists(self.BACKUP_LOCK) is False:
-                        pipe.multi()
-                        self._redis_renamenxifexists(
-                            keys=[self.ACKBUF_KEY, self.BACKUP],
-                            client=pipe)
-                        pipe.setex(self.BACKUP_LOCK, self.AUTOCLEAN_INTERVAL, 1)
-                        pipe.execute()
-                    else:
-                        pipe.unwatch()
-                except redis.WatchError:
-                    pass
+        def autoclean_loop(srq):
+            interval = min(max(float(srq.AUTOCLEAN_INTERVAL) * 0.5, 0.1), 5)
+            while True:
+                srq._autoclean(max_seconds=interval * 0.5)
+                time.sleep(interval)
+
+        if self.AUTOCLEAN_INTERVAL is not None:
+            self._autoclean_thread = Thread(
+                target=autoclean_loop, name="autocleaner", args=(self,))
+            self._autoclean_thread.daemon = True
+            self._autoclean_thread.start()
+
+    def _autoclean(self, max_seconds):
+        deadline = time.time() + max_seconds
+        while True:
+            now = time.time()
+            if now >= deadline:
+                break
+            now_micros = int(now * 10**6)
+            ackbuf_remaining = self._redis_ackbuf_to_aging(
+                    keys=[self.ACKBUF_KEY, self.ACKBUF_AGING],
+                    args=[now_micros])
+            aa_remaining = self._redis_zset_to_list_if_older(
+                    keys=[self.ACKBUF_AGING, self.QUEUE_KEY],
+                    args=[self.AUTOCLEAN_INTERVAL, now_micros])
+            if ackbuf_remaining + aa_remaining == 0:
+                break
 
     def put(self, item):
         """Adds an item to the queue.
@@ -126,7 +129,6 @@ class SafeRedisQueue(object):
                         - negative: disable blocking
 
         """
-        self._autoclean()
         if timeout < 0:
             uid = self._redis.rpoplpush(self.QUEUE_KEY, self.ACKBUF_KEY)
         else:
@@ -149,7 +151,7 @@ class SafeRedisQueue(object):
         """
         self._redis.pipeline()\
                    .lrem(self.ACKBUF_KEY, 0, uid)\
-                   .lrem(self.BACKUP, 0, uid)\
+                   .zrem(self.ACKBUF_AGING, uid)\
                    .hdel(self.ITEMS_KEY, uid)\
                    .execute()
 
@@ -160,7 +162,7 @@ class SafeRedisQueue(object):
         """
         self._redis.pipeline()\
                    .lrem(self.ACKBUF_KEY, 0, uid)\
-                   .lrem(self.BACKUP, 0, uid)\
+                   .zrem(self.ACKBUF_AGING, uid)\
                    .lpush(self.QUEUE_KEY, uid)\
                    .execute()
 
