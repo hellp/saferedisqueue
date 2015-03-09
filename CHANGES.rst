@@ -2,6 +2,30 @@
 Changes
 =======
 
+4.0b0 – 2015-03-09
+------------------
+
+- BREAKING CHANGE: the data structures used on the Redis server side
+  changed. While pure consumer instances (i.e. those only using `put`)
+  are backwards compatibility, consuming instances are **not**. This
+  means multiple consumers working on one queue must be compatible.
+  Before upgrading, make sure the queue is emptied.
+
+- The automatic requeue mechanism was reimplemented: Instead of a
+  complicated algorithm that used locks and was so poorly implemented
+  that it still had race conditions and caused inconsistent server-side
+  state occasionally, we are now using a sorted set (ZSET) that keeps
+  track of unconfirmed (neither ACK'ed *nor* FAIL'ed) and aging items.
+
+  Note however: the new mechanism uses a thread to do the cleaning every
+  x seconds (via the `autoclean_interval` parameter) independently of
+  any `get`/`pop` calls. If threading gives you a headache, check out
+  the code before using it. Remember, autocleaning is enabled by
+  default! To disable it, pass ``autoclean_interval=None`` to the
+  constructor -- this also disables any threading code; it's recommended
+  to use it always for producer-only instances.
+
+
 3.0.0 - 2014-11-13
 ------------------
 

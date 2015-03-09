@@ -71,7 +71,7 @@ class SafeRedisQueue(object):
         def autoclean_loop(srq):
             interval = min(max(float(srq.AUTOCLEAN_INTERVAL) * 0.5, 0.1), 5)
             while True:
-                srq._autoclean(max_seconds=interval * 0.5)
+                srq._autoclean(max_seconds=interval * 0.9)
                 time.sleep(interval)
 
         if self.AUTOCLEAN_INTERVAL is not None:

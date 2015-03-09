@@ -104,15 +104,32 @@ Constructor parameters
     - srq:0:items
     - srq:0:queue
     - srq:0:ackbuf
-    - srq:0:backup
-    - srq:0:backuplock
+    - srq:0:ackbuf_aging
+
+    .. attention::
+
+        The internal data structure changed in version 4.0. Pure
+        producer instances (i.e. those only using `put`) are backwards-
+        compatible, but consumer instances are not.
 
 `autoclean_interval`
-    An interval in seconds (default: 60) at which *unacknowledged* items are
-    requeued automatically. (They are moved from the internal ackbuf and backup data
-    structures to the queue again.)
+
+    An interval in seconds (default: 60) at which unconfirmed items
+    (neither ACK'ed nor FAIL'ed) are requeued automatically. They are
+    moved from the internal ackbuf/ackbuf_aging data structures to the
+    queue again.
+
+    Using this spawns a thread that does the autocleaning on a regular
+    interval.
 
     Pass ``None`` to disable autocleaning. It's enabled by default!
+
+    It's recommended to pass ``None`` when creating an instances that
+    will only be used as a producer, i.e. one that will only use
+    `put`/`push`.
+
+    *The mechanism was completely re-done in version 4.0. See CHANGES
+    for details.*
 
 `serializer`
     An optional serializer to use on the items. Default: None
