@@ -20,7 +20,6 @@ else:
 
 
 from uuid import uuid1
-import time
 
 import mock
 import pytest
@@ -51,90 +50,6 @@ def test_put_internally_converts_uuid_to_str():
     uid = queue.put('blub')
     pipeline_mock.hset.assert_called_with(queue.ITEMS_KEY, uid, 'blub')
     hset_mock.lpush.assert_called_with(queue.QUEUE_KEY, uid)
-
-
-def test_autocleanup():
-    queue = SafeRedisQueue(
-        name='saferedisqueue-test-%s' % uuid1().hex,
-        autoclean_interval=1)
-    queue.put('bad')
-    queue.put('good')
-    assert queue._redis.llen(queue.QUEUE_KEY) == 2
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 0
-    assert queue._redis.llen(queue.BACKUP) == 0
-
-    uid_bad, payload_bad = queue.get()
-    # Pop triggered first autoclean run before popping. At that time the
-    # ackbuf was still empty, so nothing was moved to backup. But the
-    # backup lock was set, to delay the next autoclean run for
-    # autoclean_interval seconds.
-    assert queue._redis.llen(queue.QUEUE_KEY) == 1
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 1  # bad item
-    assert queue._redis.llen(queue.BACKUP) == 0
-
-    uid_good, payload_good = queue.get()
-    # Autoclean started but instantly aborted due to backup lock.
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 2
-    assert queue._redis.llen(queue.BACKUP) == 0
-    assert queue._redis.llen(queue.QUEUE_KEY) == 0
-
-    queue.ack(uid_good)  # done with that one
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 1  # bad item
-    assert queue._redis.llen(queue.BACKUP) == 0
-    assert queue._redis.llen(queue.QUEUE_KEY) == 0
-
-    # Pop after a autoclean_interval triggers cleanup internally
-    time.sleep(1.2)
-    assert queue.get(timeout=-1) == (None, None)
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 0
-    assert queue._redis.llen(queue.BACKUP) == 1
-    assert queue._redis.llen(queue.QUEUE_KEY) == 0
-
-    # Next pop triggers autoclean again; requeus; pops bad item again
-    time.sleep(1.2)
-    assert queue.get(timeout=-1) == (uid_bad, payload_bad)
-
-    # After pop, queue is empty again, item waiting in ackbuf
-    assert queue._redis.llen(queue.ACKBUF_KEY) == 1
-    assert queue._redis.llen(queue.BACKUP) == 0
-    assert queue._redis.llen(queue.QUEUE_KEY) == 0
-
-
-@pytest.mark.parametrize("func_name, ok_return_val, err_return_val", [
-    ('renameifexists', b'OK', b'OK'),
-    ('renamenxifexists', 1, 0),
-])
-def test_lua_rename_scripts(func_name, ok_return_val, err_return_val):
-    queue = SafeRedisQueue()
-    key1 = 'test_saferedisqueue_' + uuid1().hex
-    key2 = 'test_saferedisqueue_' + uuid1().hex
-    key3 = 'test_saferedisqueue_' + uuid1().hex
-    key4 = 'test_saferedisqueue_' + uuid1().hex
-
-    func = getattr(queue, '_redis_' + func_name)
-
-    assert queue._redis.exists(key1) is False
-    assert queue._redis.exists(key2) is False
-
-    queue._redis.set(key1, 'foobar')
-    assert queue._redis.exists(key1) is True
-    assert queue._redis.exists(key2) is False
-
-    assert func(keys=[key1, key2]) == ok_return_val
-    assert queue._redis.exists(key1) is False
-    assert queue._redis.get(key2) == b'foobar'
-
-    assert func(keys=[key1, key2]) == b'OK'
-    assert func(keys=[key3, key2]) == b'OK'
-
-    queue._redis.set(key4, 'foobar')
-    assert func(keys=[key4, key2]) == err_return_val
-
-    # cleanup
-    queue._redis.delete(key1)
-    queue._redis.delete(key2)
-    queue._redis.delete(key3)
-    queue._redis.delete(key4)
 
 
 def test_decode_responses_true():
@@ -186,7 +101,7 @@ def test_serializer(serializer):
 
     queue = SafeRedisQueue(
         name='saferedisqueue-test-%s' % uuid1().hex,
-        autoclean_interval=1,
+        autoclean_interval=None,
         serializer=serializer
     )
 
@@ -211,7 +126,7 @@ def test_serializer_calls():
 
     queue = SafeRedisQueue(
         name='saferedisqueue-test-%s' % uuid1().hex,
-        autoclean_interval=1,
+        autoclean_interval=None,
         serializer=serializer_mock
     )
 
@@ -221,3 +136,21 @@ def test_serializer_calls():
 
     assert queue.pop()[1] == {"loads": "return"}
     serializer_mock.loads.assert_called_with(b('{"dumps": "return"}'))
+
+
+def test_autoclean_while_waiting():
+    """If items is not acked/failed, it will appear again in the queue."""
+    queue = SafeRedisQueue(
+        name='saferedisqueue-test-%s' % uuid1().hex,
+        autoclean_interval=0.1,
+    )
+
+    item = "example payload"
+    queue.push(item)
+    uid1, item1 = queue.pop()
+    assert nativestr(item1) == nativestr(item)
+    # While waiting here the item should be requeued and we should get
+    # it again.
+    uid2, item2 = queue.pop(timeout=0)
+    assert uid2 == uid1
+    assert nativestr(item2) == nativestr(item1)
